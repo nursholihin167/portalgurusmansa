@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Guru</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #eef; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0 15px; box-sizing: border-box; }
+        button { padding: 10px 20px; background: #28a745; color: white; border: none; cursor: pointer; }
+        .warning { color: red; text-align: center; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>👨‍🏫 Dashboard Input Materi</h2>
+        
+        <div id="msg-error" class="warning">
+            <h3>⛔ AKSES DITOLAK</h3>
+            <p>Email Anda tidak terdaftar sebagai Guru.</p>
+            <a href="../index.html">Kembali ke Depan</a>
+        </div>
+
+        <div id="form-area" style="display:none;">
+            <p>Login sebagai: <b id="email-guru"></b></p>
+            <hr>
+            
+            <form id="formMateri">
+                <label>Judul Materi</label>
+                <input type="text" id="judul" required placeholder="Contoh: Bab 1 Matematika">
+
+                <label>Deskripsi</label>
+                <textarea id="deskripsi" rows="3" required placeholder="Instruksi untuk siswa..."></textarea>
+
+                <label>Link File / Video</label>
+                <input type="url" id="link" required placeholder="https://drive.google.com/...">
+
+                <button type="submit">🚀 Terbitkan Materi</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        // Perhatikan titik dua (..) artinya NAIK satu folder dulu baru cari js
+        import { auth, db } from '../js/firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- KONFIGURASI EMAIL GURU (GANTI INI!) ---
+        const EMAIL_GURU = "dewiayurengganis2@gmail.com"; 
+        // -------------------------------------------
+
+        const formArea = document.getElementById('form-area');
+        const msgError = document.getElementById('msg-error');
+
+        // 1. CEK APAKAH GURU YANG LOGIN
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.email === EMAIL_GURU) {
+                // Email Cocok
+                formArea.style.display = 'block';
+                document.getElementById('email-guru').innerText = user.email;
+            } else {
+                // Belum login atau Email Salah
+                msgError.style.display = 'block';
+                if(!user) {
+                    alert("Silakan Login di halaman depan dulu!");
+                    window.location.href = "../index.html";
+                }
+            }
+        });
+
+        // 2. SIMPAN KE DATABASE
+        document.getElementById('formMateri').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const judul = document.getElementById('judul').value;
+            const deskripsi = document.getElementById('deskripsi').value;
+            const link = document.getElementById('link').value;
+
+            try {
+                await addDoc(collection(db, "materi"), {
+                    judul: judul,
+                    deskripsi: deskripsi,
+                    link_file: link,
+                    tanggal_upload: serverTimestamp()
+                });
+                alert("Berhasil! Materi sudah muncul di halaman siswa.");
+                e.target.reset(); // Kosongkan form
+            } catch (error) {
+                alert("Gagal: " + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
