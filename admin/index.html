@@ -16,45 +16,46 @@
         
         /* Tombol Aksi di List */
         .btn-edit { background: #ffc107; color: #333; margin-right: 5px; padding: 5px 10px; font-size: 14px; }
-        .btn-delete { background: #dc3545; padding: 5px 10px; font-size: 14px; }
+        .btn-delete { background: #dc3545; padding: 5px 10px; font-size: 14px; color: white; }
         .btn-cancel { background: #6c757d; display: none; margin-top: 10px; width: 100%; }
 
         .item-materi { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; justify-content: space-between; align-items: center; }
         .item-info h4 { margin: 0 0 5px; }
         .item-info p { margin: 0; color: #666; font-size: 0.9em; }
         
-        .warning { color: red; text-align: center; display: none; padding: 20px; }
+        .warning { color: red; text-align: center; display: none; padding: 20px; background: white; margin-top: 20px; border-radius: 8px; }
+        #loading-text { text-align: center; color: #666; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>👨‍🏫 Dashboard Admin</h2>
+    <h2>👨‍🏫 Dashboard Admin</h2>
+    <p id="loading-text">Sedang memuat sistem...</p>
+
+    <div id="msg-error" class="warning">
+        <h3>⛔ AKSES DITOLAK</h3>
+        <p>Email Anda tidak terdaftar sebagai Guru.</p>
+        <p>Silakan login dengan akun yang benar di halaman depan.</p>
+        <a href="../index.html">Kembali ke Depan</a>
+    </div>
+
+    <div id="form-area" class="card" style="display:none;">
+        <p>Login sebagai: <b id="email-guru">...</b></p>
+        <hr>
         
-        <div id="msg-error" class="warning">
-            <h3>⛔ AKSES DITOLAK</h3>
-            <p>Email Anda tidak terdaftar sebagai Guru.</p>
-            <a href="../index.html">Kembali ke Depan</a>
-        </div>
+        <form id="formMateri">
+            <input type="hidden" id="doc-id"> <label>Judul Materi</label>
+            <input type="text" id="judul" required placeholder="Contoh: Bab 1 Matematika">
 
-        <div id="form-area" style="display:none;">
-            <p>Login: <b id="email-guru">...</b></p>
-            <hr>
-            
-            <form id="formMateri">
-                <input type="hidden" id="doc-id"> <label>Judul Materi</label>
-                <input type="text" id="judul" required placeholder="Contoh: Bab 1 Matematika">
+            <label>Deskripsi</label>
+            <textarea id="deskripsi" rows="3" required placeholder="Instruksi untuk siswa..."></textarea>
 
-                <label>Deskripsi</label>
-                <textarea id="deskripsi" rows="3" required placeholder="Instruksi untuk siswa..."></textarea>
+            <label>Link File / Video</label>
+            <input type="url" id="link" required placeholder="https://...">
 
-                <label>Link File / Video</label>
-                <input type="url" id="link" required placeholder="https://...">
-
-                <button type="submit" id="btn-save" class="btn-submit">🚀 Terbitkan Materi</button>
-                <button type="button" id="btn-cancel" class="btn-cancel">Batal Edit (Kembali Tambah Baru)</button>
-            </form>
-        </div>
+            <button type="submit" id="btn-save" class="btn-submit">🚀 Terbitkan Materi</button>
+            <button type="button" id="btn-cancel" class="btn-cancel">Batal Edit (Kembali Tambah Baru)</button>
+        </form>
     </div>
 
     <div id="list-area" class="card" style="display:none;">
@@ -67,20 +68,20 @@
     <script type="module">
         import { auth, db } from '../js/firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        // Kita tambah import: deleteDoc, updateDoc, doc, query, orderBy, onSnapshot
+        // PERBAIKAN: getDoc sudah saya masukkan di sini (paling atas)
         import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot, getDoc } 
             from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- GANTI EMAIL GURU DI SINI ---
+        // --- ⚠️ GANTI EMAIL GURU DI BAWAH INI ---
         const EMAIL_GURU = "dewiayurengganis2@gmail.com"; 
-        // --------------------------------
+        // ----------------------------------------
 
         const formArea = document.getElementById('form-area');
         const listArea = document.getElementById('list-area');
         const msgError = document.getElementById('msg-error');
+        const loadingText = document.getElementById('loading-text');
         const materiList = document.getElementById('materi-list');
         
-        // Element Form
         const form = document.getElementById('formMateri');
         const inputJudul = document.getElementById('judul');
         const inputDeskripsi = document.getElementById('deskripsi');
@@ -91,36 +92,43 @@
 
         // 1. CEK LOGIN
         onAuthStateChanged(auth, (user) => {
+            loadingText.style.display = 'none'; // Sembunyikan loading
+            
             if (user && user.email === EMAIL_GURU) {
+                // Jika Guru Asli
                 formArea.style.display = 'block';
                 listArea.style.display = 'block';
                 document.getElementById('email-guru').innerText = user.email;
-                loadMateriAdmin(); // Load data jika admin sah
+                loadMateriAdmin(); 
             } else {
+                // Jika Bukan Guru / Belum Login
                 msgError.style.display = 'block';
+                formArea.style.display = 'none';
                 listArea.style.display = 'none';
             }
         });
 
-        // 2. FUNGSI LOAD DATA (REALTIME)
+        // 2. LOAD DATA REALTIME
         function loadMateriAdmin() {
             const q = query(collection(db, "materi"), orderBy("tanggal_upload", "desc"));
             
             onSnapshot(q, (snapshot) => {
-                materiList.innerHTML = ""; // Bersihkan list
-                if(snapshot.empty) { materiList.innerHTML = "<p>Belum ada materi.</p>"; }
+                materiList.innerHTML = ""; 
+                if(snapshot.empty) { 
+                    materiList.innerHTML = "<p>Belum ada materi. Silakan upload di atas.</p>"; 
+                    return;
+                }
 
                 snapshot.forEach((docSnap) => {
                     const data = docSnap.data();
                     const id = docSnap.id;
                     
-                    // Buat elemen HTML untuk setiap materi
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'item-materi';
                     itemDiv.innerHTML = `
                         <div class="item-info">
                             <h4>${data.judul}</h4>
-                            <p>${data.deskripsi.substring(0, 50)}...</p>
+                            <p>${data.deskripsi ? data.deskripsi.substring(0, 50) + '...' : ''}</p>
                         </div>
                         <div>
                             <button class="btn-edit" data-id="${id}">Edit</button>
@@ -130,7 +138,7 @@
                     materiList.appendChild(itemDiv);
                 });
 
-                // Pasang event listener ke tombol Edit & Hapus yang baru dibuat
+                // Pasang Event Listener Tombol
                 document.querySelectorAll('.btn-delete').forEach(btn => {
                     btn.addEventListener('click', (e) => hapusMateri(e.target.dataset.id));
                 });
@@ -140,33 +148,38 @@
             });
         }
 
-        // 3. LOGIKA SIMPAN (BISA TAMBAH BARU ATAU UPDATE)
+        // 3. LOGIKA SIMPAN (BARU / UPDATE)
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const idEdit = inputId.value; // Ambil ID jika ada
+            const idEdit = inputId.value; 
 
             const dataBaru = {
                 judul: inputJudul.value,
                 deskripsi: inputDeskripsi.value,
                 link_file: inputLink.value
-                // Tanggal upload tidak kita ubah agar urutan tetap
             };
+
+            btnSave.innerText = "⏳ Sedang Memproses...";
+            btnSave.disabled = true;
 
             try {
                 if(!idEdit) {
-                    // --- MODE TAMBAH BARU ---
-                    dataBaru.tanggal_upload = serverTimestamp(); // Tambah tanggal hanya saat baru
+                    // Tambah Baru
+                    dataBaru.tanggal_upload = serverTimestamp();
                     await addDoc(collection(db, "materi"), dataBaru);
-                    alert("✅ Materi Baru Ditambahkan!");
+                    alert("✅ Materi Berhasil Ditambahkan!");
                 } else {
-                    // --- MODE UPDATE (EDIT) ---
+                    // Update
                     await updateDoc(doc(db, "materi", idEdit), dataBaru);
-                    alert("✅ Materi Berhasil Diupdate!");
-                    resetForm(); // Kembali ke mode normal
+                    alert("✅ Materi Berhasil Diperbarui!");
+                    resetForm();
                 }
                 form.reset();
             } catch (error) {
                 alert("Gagal: " + error.message);
+            } finally {
+                btnSave.disabled = false;
+                if(!inputId.value) btnSave.innerText = "🚀 Terbitkan Materi";
             }
         });
 
@@ -176,64 +189,35 @@
                 try {
                     await deleteDoc(doc(db, "materi", id));
                 } catch (error) {
-                    alert("Gagal menghapus: " + error.message);
+                    alert("Gagal: " + error.message);
                 }
             }
         }
 
         // 5. MASUK MODE EDIT
         async function modeEdit(id) {
-            // Scroll ke atas
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
-            // Ubah tampilan tombol
-            btnSave.innerText = "💾 Simpan Perubahan";
-            btnSave.style.background = "#ffc107";
-            btnSave.style.color = "black";
-            btnCancel.style.display = "block";
+            // Ambil data detail
+            try {
+                const docSnap = await getDoc(doc(db, "materi", id));
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    // Isi form dengan data lama
+                    inputId.value = id;
+                    inputJudul.value = data.judul;
+                    inputDeskripsi.value = data.deskripsi;
+                    inputLink.value = data.link_file;
 
-            // Ambil data lama dari list (cara cepat) atau fetch ulang
-            // Kita fetch ulang biar akurat
-            // Tapi karena snapshot sudah punya datanya, kita ambil dari element juga bisa.
-            // Biar aman, kita pakai trick: Cari data di input (karena ini onSnapshot, data di memory ada, tapi aksesnya ribet).
-            // Kita panggil getDoc atau lebih mudahnya isi manual dari element HTML tadi?
-            // Cara paling PRO: Gunakan ID untuk ambil data spesifik.
-            
-            // Note: Karena kode di atas sudah onSnapshot, kita bisa saja menyimpan data di array global.
-            // Tapi untuk simplifikasi, kita isi form manual dari 'list' DOM atau biarkan kosong sebentar.
-            // Mari kita pakai cara paling aman:
-            
-            // Cari item di DOM (visual) untuk mengisi form (Quick Fill)
-            // *Catatan: Di aplikasi besar kita pakai state management, tapi ini HTML biasa.*
-            // Kita ambil dari database lagi aja biar pasti:
-            
-            inputId.value = id; // Set ID rahasia
-            // (Opsional) Kasih loading sedikit atau langsung isi jika data tersedia
-            // Di sini kita minta user isi ulang atau kita query 1 doc (best practice):
-            
-            // Ambil data spesifik document
-            // Karena kita tidak import getDoc untuk hemat baris, kita "akali" dengan mencari di array snapshot (agak rumit dijelaskan).
-            // Solusi mudah: Saat klik edit, tombol di list punya atribut data lengkap? Tidak rapi.
-            
-            // Revisi Import: Saya tambah getDoc di atas? Tidak perlu. 
-            // Kita pakai "onSnapshot" global array?
-            // Oke, cara termudah: User isi ulang? Jangan dong.
-            // Oke, saya tambahkan getDoc di import.
-            
-            // (Saya sudah update kode di atas untuk import logic, tapi agar simple saya pakai trick find data dari variable global kalau ada)
-            // TAPI, agar kode tidak makin panjang, saya akan ambil TextContent dari HTML list yang sudah ada (trick sederhana).
-            
-            // Oh tunggu, di HTML list saya cuma tampilin substring(0,50). Deskripsi panjang hilang.
-            // JADI: Kita perlu getDoc. Tapi biar Ibu ga bingung nambah import, 
-            // SAYA AKAN UBAH IMPORT DI ATAS UNTUK MENYERTAKAN 'getDoc'.
-            
-            import { getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-            const docSnap = await getDoc(doc(db, "materi", id));
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                inputJudul.value = data.judul;
-                inputDeskripsi.value = data.deskripsi;
-                inputLink.value = data.link_file;
+                    // Ubah tampilan tombol
+                    btnSave.innerText = "💾 Simpan Perubahan";
+                    btnSave.style.background = "#ffc107"; // Kuning
+                    btnSave.style.color = "black";
+                    btnCancel.style.display = "block";
+                }
+            } catch (error) {
+                console.error("Gagal ambil data edit", error);
             }
         }
 
@@ -241,14 +225,13 @@
         btnCancel.addEventListener('click', resetForm);
 
         function resetForm() {
-            inputId.value = ""; // Kosongkan ID
+            inputId.value = "";
             form.reset();
             btnSave.innerText = "🚀 Terbitkan Materi";
-            btnSave.style.background = "#28a745";
+            btnSave.style.background = "#28a745"; // Hijau kembali
             btnSave.style.color = "white";
             btnCancel.style.display = "none";
         }
     </script>
 </body>
 </html>
-
