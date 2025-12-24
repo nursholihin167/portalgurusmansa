@@ -68,7 +68,7 @@
         import { auth, db } from '../js/firebase-config.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         // Kita tambah import: deleteDoc, updateDoc, doc, query, orderBy, onSnapshot
-        import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot } 
+        import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot, getDoc } 
             from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // --- GANTI EMAIL GURU DI SINI ---
@@ -251,3 +251,4 @@
     </script>
 </body>
 </html>
+
